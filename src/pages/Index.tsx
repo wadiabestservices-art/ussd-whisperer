@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { UssdCodeCard } from "@/components/UssdCodeCard";
 import { AddUssdCodeDialog } from "@/components/AddUssdCodeDialog";
 import { toast } from "sonner";
-import { Smartphone, Zap } from "lucide-react";
+import { Smartphone, Zap, Trash2 } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
 
 interface UssdCode {
   id: string;
@@ -42,6 +45,27 @@ const Index = () => {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  // Auto-execute pending codes
+  useEffect(() => {
+    const executePendingCodes = async () => {
+      const pendingCodes = ussdCodes.filter(
+        (code) => code.status === "pending" || code.status === "success" || code.status === "error"
+      );
+
+      for (const code of pendingCodes) {
+        if (code.status !== "running") {
+          await executeUssdCode(code.id);
+          // Wait 3 seconds between executions
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+        }
+      }
+    };
+
+    if (ussdCodes.length > 0) {
+      executePendingCodes();
+    }
+  }, [ussdCodes.length]);
 
   const fetchUssdCodes = async () => {
     const { data, error } = await supabase
@@ -161,20 +185,66 @@ const Index = () => {
             <AddUssdCodeDialog />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {ussdCodes.map((code) => (
-              <UssdCodeCard
-                key={code.id}
-                id={code.id}
-                name={code.name}
-                code={code.code}
-                description={code.description}
-                status={code.status}
-                lastExecutedAt={code.last_executed_at}
-                lastResult={code.last_result}
-                onDelete={deleteUssdCode}
-              />
-            ))}
+          <div className="rounded-lg border border-border/50 bg-card shadow-sm overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Last Executed</TableHead>
+                  <TableHead>Last Result</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {ussdCodes.map((code) => (
+                  <TableRow key={code.id}>
+                    <TableCell className="font-medium">{code.name}</TableCell>
+                    <TableCell>
+                      <code className="text-sm font-mono text-accent">{code.code}</code>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {code.description || "-"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        className={`${
+                          code.status === "success"
+                            ? "bg-gradient-success"
+                            : code.status === "running"
+                            ? "bg-gradient-primary"
+                            : code.status === "error"
+                            ? "bg-destructive"
+                            : "bg-muted"
+                        } text-white border-0`}
+                      >
+                        {code.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {code.last_executed_at
+                        ? format(new Date(code.last_executed_at), "PPp")
+                        : "-"}
+                    </TableCell>
+                    <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
+                      {code.last_result || "-"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        onClick={() => deleteUssdCode(code.id)}
+                        variant="outline"
+                        size="icon"
+                        className="hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         )}
       </div>
