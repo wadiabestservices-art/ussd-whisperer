@@ -47,7 +47,7 @@ const Index = () => {
     const { data, error } = await supabase
       .from("ussd_codes")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("id", { ascending: true });
 
     if (error) {
       toast.error("Failed to fetch USSD codes");
@@ -172,7 +172,6 @@ const Index = () => {
                 status={code.status}
                 lastExecutedAt={code.last_executed_at}
                 lastResult={code.last_result}
-                onExecute={executeUssdCode}
                 onDelete={deleteUssdCode}
               />
             ))}

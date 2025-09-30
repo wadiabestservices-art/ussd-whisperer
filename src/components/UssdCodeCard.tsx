@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Play, Clock, Trash2 } from "lucide-react";
+import { Clock, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 interface UssdCodeCardProps {
@@ -12,7 +12,6 @@ interface UssdCodeCardProps {
   status: string;
   lastExecutedAt?: string;
   lastResult?: string;
-  onExecute: (id: string) => void;
   onDelete: (id: string) => void;
 }
 
@@ -24,7 +23,6 @@ export const UssdCodeCard = ({
   status,
   lastExecutedAt,
   lastResult,
-  onExecute,
   onDelete,
 }: UssdCodeCardProps) => {
   const getStatusColor = () => {
@@ -73,15 +71,7 @@ export const UssdCodeCard = ({
           </div>
         )}
 
-        <div className="flex gap-2 pt-2">
-          <Button
-            onClick={() => onExecute(id)}
-            disabled={status === "running"}
-            className="flex-1 bg-gradient-primary hover:opacity-90 transition-opacity"
-          >
-            <Play className="h-4 w-4 mr-2" />
-            {status === "running" ? "Executing..." : "Execute"}
-          </Button>
+        <div className="flex justify-end pt-2">
           <Button
             onClick={() => onDelete(id)}
             variant="outline"
