@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { AddUssdCodeDialog } from "@/components/AddUssdCodeDialog";
 import { toast } from "sonner";
 import { Smartphone, Zap, Trash2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -159,12 +158,9 @@ const Index = () => {
             </div>
           </div>
           
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Zap className="h-4 w-4 text-accent" />
-              <span>{ussdCodes.length} codes configured</span>
-            </div>
-            <AddUssdCodeDialog />
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Zap className="h-4 w-4 text-accent" />
+            <span>{ussdCodes.length} codes configured • Auto-executing</span>
           </div>
         </div>
 
@@ -178,11 +174,10 @@ const Index = () => {
             <div className="inline-flex p-6 rounded-full bg-muted/50 mb-4">
               <Smartphone className="h-12 w-12 text-muted-foreground" />
             </div>
-            <h2 className="text-2xl font-semibold mb-2">No USSD codes yet</h2>
-            <p className="text-muted-foreground mb-6">
-              Get started by adding your first USSD code
+            <h2 className="text-2xl font-semibold mb-2">No USSD codes in database</h2>
+            <p className="text-muted-foreground">
+              USSD codes will be loaded from the database and executed automatically
             </p>
-            <AddUssdCodeDialog />
           </div>
         ) : (
           <div className="rounded-lg border border-border/50 bg-card shadow-sm overflow-hidden">
