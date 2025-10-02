@@ -1,73 +1,199 @@
-# Welcome to your Lovable project
+# USSD Whisperer - Multi-Level USSD Code Executor
 
-## Project info
+An Android app for executing and automating multi-level USSD codes with native capabilities.
 
-**URL**: https://lovable.dev/projects/fda65a19-f4d9-45e1-8c13-f44d1fbe3949
+## Features
 
-## How can I edit this code?
+- ✨ Multi-level USSD code execution with step-by-step processing
+- 📱 Native Android app with phone permissions
+- 🔄 Automatic execution of pending USSD codes
+- 💾 Database storage for USSD codes and results
+- 📊 Real-time status updates and execution tracking
+- 🎯 10 pre-configured multi-level USSD codes
 
-There are several ways of editing your application.
+## Technology Stack
 
-**Use Lovable**
+- **Frontend**: React + TypeScript + Vite
+- **UI**: Tailwind CSS + shadcn/ui
+- **Backend**: Lovable Cloud (Supabase)
+- **Mobile**: Capacitor (Android)
+- **Database**: PostgreSQL with real-time subscriptions
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/fda65a19-f4d9-45e1-8c13-f44d1fbe3949) and start prompting.
+## Getting Started
 
-Changes made via Lovable will be committed automatically to this repo.
+### Running in Lovable
 
-**Use your preferred IDE**
+The app runs automatically in the Lovable preview environment.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Building for Android
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+To run this app natively on an Android device:
 
-Follow these steps:
+1. **Export to GitHub**
+   - Click "Export to Github" button in Lovable
+   - Clone your repository locally
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+2. **Install Dependencies**
+   ```bash
+   git clone <YOUR_GIT_URL>
+   cd ussd-whisperer
+   npm install
+   ```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+3. **Add Android Platform**
+   ```bash
+   npx cap add android
+   ```
 
-# Step 3: Install the necessary dependencies.
-npm i
+4. **Update Android Platform**
+   ```bash
+   npx cap update android
+   ```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+5. **Build the Web Assets**
+   ```bash
+   npm run build
+   ```
+
+6. **Sync Capacitor**
+   ```bash
+   npx cap sync android
+   ```
+
+7. **Open in Android Studio**
+   ```bash
+   npx cap open android
+   ```
+
+8. **Run on Device/Emulator**
+   - Connect your Android device or start an emulator
+   - Click "Run" in Android Studio
+   - Or use: `npx cap run android`
+
+### Required Permissions
+
+The app requires the following Android permissions:
+- `CALL_PHONE` - To execute USSD codes
+- `READ_PHONE_STATE` - To monitor USSD execution
+- `PROCESS_OUTGOING_CALLS` - To intercept USSD results
+- `INTERNET` - For database synchronization
+
+## Multi-Level USSD Codes
+
+The app supports complex multi-level USSD workflows:
+
+### Example Multi-Level Flow
+```json
+{
+  "name": "Bank Transfer",
+  "code": "*121*1#",
+  "levels": [
+    {"step": 1, "prompt": "Select bank from list", "code": "*121*1#"},
+    {"step": 2, "prompt": "Enter account number", "code": "*121*1*{input}#"},
+    {"step": 3, "prompt": "Enter amount", "code": "*121*1*{input}*{input2}#"},
+    {"step": 4, "prompt": "Enter PIN", "code": "*121*1*{input}*{input2}*{input3}#"}
+  ]
+}
 ```
 
-**Edit a file directly in GitHub**
+## Pre-configured USSD Codes
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+The app comes with 10 multi-level USSD codes:
+1. Check Balance - Multi Step
+2. Mobile Data Bundle
+3. Airtime Transfer
+4. Bill Payment
+5. Bank Transfer
+6. Loan Request
+7. Recharge Card
+8. Check Transaction History
+9. Mobile Insurance
+10. Service Activation
 
-**Use GitHub Codespaces**
+## Database Schema
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### ussd_codes Table
+- `id` (uuid) - Primary key
+- `name` (text) - USSD code name
+- `code` (text) - USSD code string
+- `description` (text) - Description
+- `status` (text) - pending | running | success | error
+- `levels` (jsonb) - Multi-level steps
+- `current_level` (integer) - Current execution step
+- `session_data` (jsonb) - Session variables
+- `last_executed_at` (timestamp) - Last execution time
+- `last_result` (text) - Last execution result
 
-## What technologies are used for this project?
+## Auto-Execution
 
-This project is built with:
+The app automatically executes pending USSD codes:
+- Checks for pending codes on app load
+- Executes each code with 3-second intervals
+- Processes multi-level flows step by step
+- Updates status in real-time
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Development
 
-## How can I deploy this project?
+### Hot Reload (Development)
 
-Simply open [Lovable](https://lovable.dev/projects/fda65a19-f4d9-45e1-8c13-f44d1fbe3949) and click on Share -> Publish.
+For development with hot reload:
 
-## Can I connect a custom domain to my Lovable project?
+1. Update `capacitor.config.ts` with your local IP:
+   ```typescript
+   server: {
+     url: 'http://YOUR_LOCAL_IP:5173',
+     cleartext: true
+   }
+   ```
 
-Yes, you can!
+2. Run dev server:
+   ```bash
+   npm run dev
+   ```
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+3. Sync and run:
+   ```bash
+   npx cap sync android
+   npx cap run android
+   ```
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+### Production Build
+
+For production (using deployed URL):
+
+```typescript
+server: {
+  url: 'https://your-app.lovable.app',
+  cleartext: true
+}
+```
+
+## Troubleshooting
+
+### USSD Not Executing on Android
+- Ensure CALL_PHONE permission is granted
+- Check that your device supports USSD codes
+- Verify network connection
+
+### Build Errors
+- Run `npm install` to ensure all dependencies are installed
+- Clear cache: `npx cap sync android --force`
+- Rebuild: `npm run build && npx cap sync android`
+
+### Permissions Denied
+- Manually grant permissions in Android Settings > Apps > USSD Whisperer > Permissions
+
+## Project Info
+
+**Lovable Project URL**: https://lovable.dev/projects/fda65a19-f4d9-45e1-8c13-f44d1fbe3949
+
+## Learn More
+
+- [Capacitor Documentation](https://capacitorjs.com/docs)
+- [Lovable Cloud Documentation](https://docs.lovable.dev/features/cloud)
+- [Android USSD Documentation](https://developer.android.com/reference/android/telephony/TelephonyManager)
+- [Lovable Mobile Development Guide](https://lovable.dev/blogs/TODO)
+
+## License
+
+MIT

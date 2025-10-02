@@ -18,33 +18,42 @@ export type Database = {
         Row: {
           code: string
           created_at: string
+          current_level: number | null
           description: string | null
           id: string
           last_executed_at: string | null
           last_result: string | null
+          levels: Json | null
           name: string
+          session_data: Json | null
           status: string | null
           updated_at: string
         }
         Insert: {
           code: string
           created_at?: string
+          current_level?: number | null
           description?: string | null
           id?: string
           last_executed_at?: string | null
           last_result?: string | null
+          levels?: Json | null
           name: string
+          session_data?: Json | null
           status?: string | null
           updated_at?: string
         }
         Update: {
           code?: string
           created_at?: string
+          current_level?: number | null
           description?: string | null
           id?: string
           last_executed_at?: string | null
           last_result?: string | null
+          levels?: Json | null
           name?: string
+          session_data?: Json | null
           status?: string | null
           updated_at?: string
         }

@@ -7,6 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 
+interface UssdLevel {
+  step: number;
+  prompt: string;
+  code: string;
+}
+
 interface UssdCode {
   id: string;
   name: string;
@@ -15,6 +21,9 @@ interface UssdCode {
   status: string;
   last_executed_at?: string;
   last_result?: string;
+  levels?: UssdLevel[];
+  current_level?: number;
+  session_data?: Record<string, any>;
 }
 
 const Index = () => {
@@ -76,7 +85,13 @@ const Index = () => {
       toast.error("Failed to fetch USSD codes");
       console.error(error);
     } else {
-      setUssdCodes(data || []);
+      // Transform the data to match our interface
+      const transformedData = data?.map(code => ({
+        ...code,
+        levels: code.levels as unknown as UssdLevel[] | undefined,
+        session_data: code.session_data as unknown as Record<string, any> | undefined,
+      })) || [];
+      setUssdCodes(transformedData);
     }
     setLoading(false);
   };
@@ -88,41 +103,83 @@ const Index = () => {
     // Update status to running
     await supabase
       .from("ussd_codes")
-      .update({ status: "running" })
+      .update({ status: "running", current_level: 0 })
       .eq("id", id);
 
-    toast.loading(`Executing ${code.code}...`, { id: `exec-${id}` });
+    const hasLevels = code.levels && code.levels.length > 0;
+    const levelCount = hasLevels ? code.levels.length : 1;
 
-    // Simulate USSD execution (in real app, this would call actual USSD API)
-    setTimeout(async () => {
+    toast.loading(
+      `Executing ${code.code}... ${hasLevels ? `(Multi-level: ${levelCount} steps)` : ""}`,
+      { id: `exec-${id}` }
+    );
+
+    // Simulate multi-level USSD execution
+    const executeLevel = async (level: number) => {
+      if (hasLevels && level < code.levels!.length) {
+        const currentLevelData = code.levels![level];
+        
+        // Update current level
+        await supabase
+          .from("ussd_codes")
+          .update({ current_level: level })
+          .eq("id", id);
+
+        toast.loading(
+          `Step ${level + 1}/${code.levels!.length}: ${currentLevelData.prompt}`,
+          { id: `exec-${id}` }
+        );
+
+        // Wait 2 seconds between levels
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        
+        // Continue to next level
+        if (level + 1 < code.levels!.length) {
+          await executeLevel(level + 1);
+        } else {
+          // Final level - complete execution
+          await completeExecution();
+        }
+      } else {
+        // Single level execution
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await completeExecution();
+      }
+    };
+
+    const completeExecution = async () => {
       const mockResults = [
-        "Balance: $50.00\nExpiry: 30 days",
-        "Transaction successful\nRef: TXN123456",
-        "Data Bundle: 2GB\nValid until: 15 Jan 2025",
-        "SMS Bundle: 100 SMS\nRemaining: 75 SMS",
-        "Your number: +1234567890\nPlan: Premium",
+        "✓ Transaction completed successfully\nRef: TXN" + Math.random().toString(36).substr(2, 9).toUpperCase(),
+        "✓ Balance: $" + (Math.random() * 100 + 50).toFixed(2) + "\nExpiry: 30 days",
+        "✓ Data Bundle activated: 2GB\nValid until: " + new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(),
+        "✓ Payment successful\nAmount: $" + (Math.random() * 50 + 10).toFixed(2),
+        "✓ Service activated\nStatus: Active",
       ];
       
       const result = mockResults[Math.floor(Math.random() * mockResults.length)];
-      const isSuccess = Math.random() > 0.1; // 90% success rate
+      const isSuccess = Math.random() > 0.15; // 85% success rate
 
       await supabase
         .from("ussd_codes")
         .update({
           status: isSuccess ? "success" : "error",
           last_executed_at: new Date().toISOString(),
-          last_result: isSuccess ? result : "Execution failed: Network timeout",
+          last_result: isSuccess ? result : "⚠ Execution failed: Network timeout or invalid input",
+          current_level: 0,
         })
         .eq("id", id);
 
       toast.dismiss(`exec-${id}`);
       
       if (isSuccess) {
-        toast.success(`${code.name} executed successfully`);
+        toast.success(`${code.name} completed successfully`);
       } else {
         toast.error(`${code.name} execution failed`);
       }
-    }, 2000);
+    };
+
+    // Start execution from level 0
+    await executeLevel(0);
   };
 
   const deleteUssdCode = async (id: string) => {
@@ -196,12 +253,24 @@ const Index = () => {
               <TableBody>
                 {ussdCodes.map((code) => (
                   <TableRow key={code.id}>
-                    <TableCell className="font-medium">{code.name}</TableCell>
+                    <TableCell className="font-medium">
+                      {code.name}
+                      {code.levels && code.levels.length > 0 && (
+                        <Badge variant="outline" className="ml-2 text-xs">
+                          {code.levels.length} levels
+                        </Badge>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <code className="text-sm font-mono text-accent">{code.code}</code>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="text-muted-foreground text-sm">
                       {code.description || "-"}
+                      {code.current_level !== undefined && code.current_level > 0 && (
+                        <div className="text-xs text-primary mt-1">
+                          Current: Step {code.current_level + 1}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge
