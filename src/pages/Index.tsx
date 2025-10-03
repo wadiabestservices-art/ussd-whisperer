@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Smartphone, Zap, Trash2 } from "lucide-react";
+import { executeUssdCode as executeNativeUssd } from "@/plugins/ussd";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -100,86 +101,73 @@ const Index = () => {
     const code = ussdCodes.find((c) => c.id === id);
     if (!code) return;
 
-    // Update status to running
-    await supabase
-      .from("ussd_codes")
-      .update({ status: "running", current_level: 0 })
-      .eq("id", id);
+    try {
+      // Update status to running
+      await supabase
+        .from("ussd_codes")
+        .update({ status: "running", current_level: 0 })
+        .eq("id", id);
 
-    const hasLevels = code.levels && code.levels.length > 0;
-    const levelCount = hasLevels ? code.levels.length : 1;
+      const hasLevels = code.levels && code.levels.length > 0;
 
-    toast.loading(
-      `Executing ${code.code}... ${hasLevels ? `(Multi-level: ${levelCount} steps)` : ""}`,
-      { id: `exec-${id}` }
-    );
-
-    // Simulate multi-level USSD execution
-    const executeLevel = async (level: number) => {
-      if (hasLevels && level < code.levels!.length) {
-        const currentLevelData = code.levels![level];
+      if (hasLevels) {
+        // Execute multi-level USSD
+        toast.info(`${code.name}: Multi-level USSD (${code.levels!.length} steps)`);
         
-        // Update current level
-        await supabase
-          .from("ussd_codes")
-          .update({ current_level: level })
-          .eq("id", id);
+        for (let level = 0; level < code.levels!.length; level++) {
+          const currentLevelData = code.levels![level];
+          
+          await supabase
+            .from("ussd_codes")
+            .update({ current_level: level })
+            .eq("id", id);
 
-        toast.loading(
-          `Step ${level + 1}/${code.levels!.length}: ${currentLevelData.prompt}`,
-          { id: `exec-${id}` }
-        );
-
-        // Wait 2 seconds between levels
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        
-        // Continue to next level
-        if (level + 1 < code.levels!.length) {
-          await executeLevel(level + 1);
-        } else {
-          // Final level - complete execution
-          await completeExecution();
+          toast.loading(`Step ${level + 1}: ${currentLevelData.prompt}`, { id: `exec-${id}` });
+          
+          // Execute native USSD code for this level
+          await executeNativeUssd(currentLevelData.code);
+          
+          // Wait before next level
+          if (level < code.levels!.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
         }
       } else {
-        // Single level execution
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        await completeExecution();
+        // Execute single-level USSD
+        toast.loading(`Executing ${code.name}...`, { id: `exec-${id}` });
+        await executeNativeUssd(code.code);
       }
-    };
 
-    const completeExecution = async () => {
-      const mockResults = [
-        "✓ Transaction completed successfully\nRef: TXN" + Math.random().toString(36).substr(2, 9).toUpperCase(),
-        "✓ Balance: $" + (Math.random() * 100 + 50).toFixed(2) + "\nExpiry: 30 days",
-        "✓ Data Bundle activated: 2GB\nValid until: " + new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-        "✓ Payment successful\nAmount: $" + (Math.random() * 50 + 10).toFixed(2),
-        "✓ Service activated\nStatus: Active",
-      ];
-      
-      const result = mockResults[Math.floor(Math.random() * mockResults.length)];
-      const isSuccess = Math.random() > 0.15; // 85% success rate
-
+      // Update success status
       await supabase
         .from("ussd_codes")
         .update({
-          status: isSuccess ? "success" : "error",
+          status: "success",
           last_executed_at: new Date().toISOString(),
-          last_result: isSuccess ? result : "⚠ Execution failed: Network timeout or invalid input",
+          last_result: "✓ USSD code sent to device",
           current_level: 0,
         })
         .eq("id", id);
 
       toast.dismiss(`exec-${id}`);
-      
-      if (isSuccess) {
-        toast.success(`${code.name} completed successfully`);
-      } else {
-        toast.error(`${code.name} execution failed`);
-      }
-    };
+      toast.success(`${code.name} sent to device`);
 
-    // Start execution from level 0
-    await executeLevel(0);
+    } catch (error) {
+      console.error("USSD execution error:", error);
+      
+      await supabase
+        .from("ussd_codes")
+        .update({
+          status: "error",
+          last_executed_at: new Date().toISOString(),
+          last_result: "⚠ Failed to execute USSD code",
+          current_level: 0,
+        })
+        .eq("id", id);
+
+      toast.dismiss(`exec-${id}`);
+      toast.error(`${code.name} execution failed`);
+    }
   };
 
   const deleteUssdCode = async (id: string) => {
