@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Smartphone, Zap, Trash2 } from "lucide-react";
-import { executeUssdCode as executeNativeUssd } from "@/plugins/ussd";
+import { executeUssdCode, executeMultiLevelUssd } from "@/plugins/ussd";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -64,9 +64,9 @@ const Index = () => {
 
       for (const code of pendingCodes) {
         if (code.status !== "running") {
-          await executeUssdCode(code.id);
-          // Wait 3 seconds between executions
-          await new Promise((resolve) => setTimeout(resolve, 3000));
+          await executeUssdCodeHandler(code.id);
+          // Wait 5 seconds between executions
+          await new Promise((resolve) => setTimeout(resolve, 5000));
         }
       }
     };
@@ -97,60 +97,43 @@ const Index = () => {
     setLoading(false);
   };
 
-  const executeUssdCode = async (id: string) => {
+  const executeUssdCodeHandler = async (id: string) => {
     const code = ussdCodes.find((c) => c.id === id);
     if (!code) return;
 
     try {
-      // Update status to running
       await supabase
         .from("ussd_codes")
         .update({ status: "running", current_level: 0 })
         .eq("id", id);
 
       const hasLevels = code.levels && code.levels.length > 0;
+      let result: string;
 
       if (hasLevels) {
-        // Execute multi-level USSD
-        toast.info(`${code.name}: Multi-level USSD (${code.levels!.length} steps)`);
+        toast.loading(`Executing ${code.name} (${code.levels!.length} steps)...`, { id: `exec-${id}` });
         
-        for (let level = 0; level < code.levels!.length; level++) {
-          const currentLevelData = code.levels![level];
-          
-          await supabase
-            .from("ussd_codes")
-            .update({ current_level: level })
-            .eq("id", id);
-
-          toast.loading(`Step ${level + 1}: ${currentLevelData.prompt}`, { id: `exec-${id}` });
-          
-          // Execute native USSD code for this level
-          await executeNativeUssd(currentLevelData.code);
-          
-          // Wait before next level
-          if (level < code.levels!.length - 1) {
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-          }
-        }
+        // Execute multi-level USSD automatically
+        const responses = await executeMultiLevelUssd(code.levels!);
+        result = responses.join("\n");
+        
       } else {
-        // Execute single-level USSD
         toast.loading(`Executing ${code.name}...`, { id: `exec-${id}` });
-        await executeNativeUssd(code.code);
+        result = await executeUssdCode(code.code);
       }
 
-      // Update success status
       await supabase
         .from("ussd_codes")
         .update({
           status: "success",
           last_executed_at: new Date().toISOString(),
-          last_result: "✓ USSD code sent to device",
+          last_result: result,
           current_level: 0,
         })
         .eq("id", id);
 
       toast.dismiss(`exec-${id}`);
-      toast.success(`${code.name} sent to device`);
+      toast.success(`${code.name} completed`);
 
     } catch (error) {
       console.error("USSD execution error:", error);
@@ -160,13 +143,13 @@ const Index = () => {
         .update({
           status: "error",
           last_executed_at: new Date().toISOString(),
-          last_result: "⚠ Failed to execute USSD code",
+          last_result: `⚠ ${error}`,
           current_level: 0,
         })
         .eq("id", id);
 
       toast.dismiss(`exec-${id}`);
-      toast.error(`${code.name} execution failed`);
+      toast.error(`${code.name} failed`);
     }
   };
 
