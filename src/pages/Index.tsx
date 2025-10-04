@@ -7,6 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { AddUssdCodeDialog } from "@/components/AddUssdCodeDialog";
+import { SimCardManager } from "@/components/SimCardManager";
 
 interface UssdLevel {
   step: number;
@@ -25,14 +27,26 @@ interface UssdCode {
   levels?: UssdLevel[];
   current_level?: number;
   session_data?: Record<string, any>;
+  category: "topup" | "activation" | "check";
+  operator: "inwi" | "iam" | "orange";
+}
+
+interface SimCard {
+  id: string;
+  name: string;
+  operator: "inwi" | "iam" | "orange";
+  enabled: boolean;
+  daily_activation_count: number;
 }
 
 const Index = () => {
   const [ussdCodes, setUssdCodes] = useState<UssdCode[]>([]);
+  const [simCards, setSimCards] = useState<SimCard[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchUssdCodes();
+    fetchSimCards();
     
     // Subscribe to realtime changes
     const channel = supabase
@@ -54,6 +68,16 @@ const Index = () => {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  const fetchSimCards = async () => {
+    const { data, error } = await supabase
+      .from("sim_cards")
+      .select("*");
+
+    if (!error && data) {
+      setSimCards(data);
+    }
+  };
 
   // Auto-execute pending codes
   useEffect(() => {
@@ -101,6 +125,22 @@ const Index = () => {
     const code = ussdCodes.find((c) => c.id === id);
     if (!code) return;
 
+    // Find available SIM card with matching operator
+    const availableSim = simCards.find(
+      (sim) => sim.enabled && sim.operator === code.operator
+    );
+
+    if (!availableSim) {
+      toast.error(`No enabled SIM card found for ${code.operator.toUpperCase()} operator`);
+      return;
+    }
+
+    // Check daily limit for activation codes
+    if (code.category === "activation" && availableSim.daily_activation_count >= 20) {
+      toast.error(`SIM card ${availableSim.name} has reached its daily limit of 20 activation codes`);
+      return;
+    }
+
     try {
       await supabase
         .from("ussd_codes")
@@ -132,8 +172,20 @@ const Index = () => {
         })
         .eq("id", id);
 
+      // Increment daily activation count if it's an activation code
+      if (code.category === "activation") {
+        await supabase
+          .from("sim_cards")
+          .update({
+            daily_activation_count: availableSim.daily_activation_count + 1,
+          })
+          .eq("id", availableSim.id);
+        
+        fetchSimCards(); // Refresh SIM cards
+      }
+
       toast.dismiss(`exec-${id}`);
-      toast.success(`${code.name} completed`);
+      toast.success(`${code.name} completed on ${availableSim.name}`);
 
     } catch (error) {
       console.error("USSD execution error:", error);
@@ -172,18 +224,21 @@ const Index = () => {
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header */}
         <div className="mb-8 space-y-4">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-3 rounded-xl bg-gradient-primary">
-              <Smartphone className="h-8 w-8 text-white" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-gradient-primary">
+                <Smartphone className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+                  USSD Executor
+                </h1>
+                <p className="text-muted-foreground">
+                  Automate and manage your USSD codes
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                USSD Executor
-              </h1>
-              <p className="text-muted-foreground">
-                Automate and manage your USSD codes
-              </p>
-            </div>
+            <AddUssdCodeDialog />
           </div>
           
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -191,6 +246,8 @@ const Index = () => {
             <span>{ussdCodes.length} codes configured • Auto-executing</span>
           </div>
         </div>
+
+        <SimCardManager />
 
         {/* Content */}
         {loading ? (
@@ -208,12 +265,14 @@ const Index = () => {
             </p>
           </div>
         ) : (
-          <div className="rounded-lg border border-border/50 bg-card shadow-sm overflow-hidden">
+          <div className="rounded-lg border border-border/50 bg-card shadow-sm overflow-hidden mt-8">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Code</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Operator</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Last Executed</TableHead>
@@ -234,6 +293,16 @@ const Index = () => {
                     </TableCell>
                     <TableCell>
                       <code className="text-sm font-mono text-accent">{code.code}</code>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize">
+                        {code.category}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="uppercase">
+                        {code.operator}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {code.description || "-"}

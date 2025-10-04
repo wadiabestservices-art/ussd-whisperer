@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -13,6 +14,8 @@ export const AddUssdCodeDialog = () => {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
+  const [category, setCategory] = useState<"topup" | "activation" | "check">("check");
+  const [operator, setOperator] = useState<"inwi" | "iam" | "orange">("inwi");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -31,6 +34,8 @@ export const AddUssdCodeDialog = () => {
         name,
         code,
         description: description || null,
+        category,
+        operator,
       });
 
     setLoading(false);
@@ -95,6 +100,34 @@ export const AddUssdCodeDialog = () => {
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="category">Category</Label>
+            <Select value={category} onValueChange={(value: any) => setCategory(value)}>
+              <SelectTrigger id="category">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="topup">Top Up</SelectItem>
+                <SelectItem value="activation">Activation</SelectItem>
+                <SelectItem value="check">Check</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="operator">Operator</Label>
+            <Select value={operator} onValueChange={(value: any) => setOperator(value)}>
+              <SelectTrigger id="operator">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="inwi">INWI</SelectItem>
+                <SelectItem value="iam">IAM</SelectItem>
+                <SelectItem value="orange">Orange</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <Button

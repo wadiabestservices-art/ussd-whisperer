@@ -14,8 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      sim_cards: {
+        Row: {
+          created_at: string
+          daily_activation_count: number
+          enabled: boolean
+          id: string
+          last_reset_date: string
+          name: string
+          operator: Database["public"]["Enums"]["operator_type"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          daily_activation_count?: number
+          enabled?: boolean
+          id?: string
+          last_reset_date?: string
+          name: string
+          operator: Database["public"]["Enums"]["operator_type"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          daily_activation_count?: number
+          enabled?: boolean
+          id?: string
+          last_reset_date?: string
+          name?: string
+          operator?: Database["public"]["Enums"]["operator_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ussd_codes: {
         Row: {
+          category: Database["public"]["Enums"]["ussd_category"]
           code: string
           created_at: string
           current_level: number | null
@@ -25,11 +59,13 @@ export type Database = {
           last_result: string | null
           levels: Json | null
           name: string
+          operator: Database["public"]["Enums"]["operator_type"]
           session_data: Json | null
           status: string | null
           updated_at: string
         }
         Insert: {
+          category?: Database["public"]["Enums"]["ussd_category"]
           code: string
           created_at?: string
           current_level?: number | null
@@ -39,11 +75,13 @@ export type Database = {
           last_result?: string | null
           levels?: Json | null
           name: string
+          operator?: Database["public"]["Enums"]["operator_type"]
           session_data?: Json | null
           status?: string | null
           updated_at?: string
         }
         Update: {
+          category?: Database["public"]["Enums"]["ussd_category"]
           code?: string
           created_at?: string
           current_level?: number | null
@@ -53,6 +91,7 @@ export type Database = {
           last_result?: string | null
           levels?: Json | null
           name?: string
+          operator?: Database["public"]["Enums"]["operator_type"]
           session_data?: Json | null
           status?: string | null
           updated_at?: string
@@ -67,7 +106,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      operator_type: "inwi" | "iam" | "orange"
+      ussd_category: "topup" | "activation" | "check"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -194,6 +234,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      operator_type: ["inwi", "iam", "orange"],
+      ussd_category: ["topup", "activation", "check"],
+    },
   },
 } as const
