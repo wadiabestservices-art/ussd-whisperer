@@ -74,30 +74,72 @@ public class UssdPlugin extends Plugin {
             return;
         }
 
-        try {
-            JSArray responses = new JSArray();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            executeMultiLevelUssdModern(levels, call);
+        } else {
+            call.reject("Multi-level USSD requires Android 8.0 or higher");
+        }
+    }
+
+    private void executeMultiLevelUssdModern(JSArray levels, PluginCall call) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            TelephonyManager telephonyManager = (TelephonyManager) getContext()
+                .getSystemService(Context.TELEPHONY_SERVICE);
             
-            for (int i = 0; i < levels.length(); i++) {
-                JSONObject level = levels.getJSONObject(i);
-                String code = level.getString("code");
-                
-                // Execute each level
-                String response = executeUssdSync(code);
-                responses.put(response);
-                
-                // Wait between levels
-                if (i < levels.length() - 1) {
-                    Thread.sleep(2000);
-                }
+            if (telephonyManager == null) {
+                call.reject("TelephonyManager not available");
+                return;
             }
-            
-            JSObject result = new JSObject();
-            result.put("success", true);
-            result.put("responses", responses);
-            call.resolve(result);
-            
-        } catch (Exception e) {
-            call.reject("Failed to execute multi-level USSD: " + e.getMessage());
+
+            try {
+                JSONObject firstLevel = levels.getJSONObject(0);
+                String firstCode = firstLevel.getString("code");
+                
+                JSArray responses = new JSArray();
+                final int[] currentLevelIndex = {0};
+                
+                telephonyManager.sendUssdRequest(firstCode, 
+                    new TelephonyManager.UssdResponseCallback() {
+                        @Override
+                        public void onReceiveUssdResponse(TelephonyManager tm, 
+                            String request, CharSequence response) {
+                            try {
+                                responses.put(response.toString());
+                                currentLevelIndex[0]++;
+                                
+                                // If there are more levels, send the next response
+                                if (currentLevelIndex[0] < levels.length()) {
+                                    JSONObject nextLevel = levels.getJSONObject(currentLevelIndex[0]);
+                                    String nextCode = nextLevel.getString("code");
+                                    
+                                    // Continue the USSD session with next code
+                                    tm.sendUssdRequest(nextCode, this, null);
+                                } else {
+                                    // All levels complete
+                                    JSObject result = new JSObject();
+                                    result.put("success", true);
+                                    result.put("responses", responses);
+                                    call.resolve(result);
+                                }
+                            } catch (Exception e) {
+                                call.reject("Error processing USSD level: " + e.getMessage());
+                            }
+                        }
+
+                        @Override
+                        public void onReceiveUssdResponseFailed(TelephonyManager tm, 
+                            String request, int failureCode) {
+                            JSObject result = new JSObject();
+                            result.put("success", false);
+                            result.put("responses", responses);
+                            call.reject("USSD failed at level " + (currentLevelIndex[0] + 1) + 
+                                " with code: " + failureCode);
+                        }
+                    }, null);
+                    
+            } catch (Exception e) {
+                call.reject("Failed to start multi-level USSD: " + e.getMessage());
+            }
         }
     }
 
@@ -161,43 +203,4 @@ public class UssdPlugin extends Plugin {
         }
     }
 
-    private String executeUssdSync(String code) throws Exception {
-        // Synchronous execution for multi-level USSD
-        // This is a simplified version - real implementation needs proper callback handling
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            TelephonyManager telephonyManager = (TelephonyManager) getContext()
-                .getSystemService(Context.TELEPHONY_SERVICE);
-            
-            final String[] response = new String[1];
-            final boolean[] completed = new boolean[1];
-            
-            telephonyManager.sendUssdRequest(code, 
-                new TelephonyManager.UssdResponseCallback() {
-                    @Override
-                    public void onReceiveUssdResponse(TelephonyManager telephonyManager, 
-                        String request, CharSequence res) {
-                        response[0] = res.toString();
-                        completed[0] = true;
-                    }
-
-                    @Override
-                    public void onReceiveUssdResponseFailed(TelephonyManager telephonyManager, 
-                        String request, int failureCode) {
-                        response[0] = "Failed: " + failureCode;
-                        completed[0] = true;
-                    }
-                }, null);
-            
-            // Wait for response (timeout after 30 seconds)
-            int timeout = 0;
-            while (!completed[0] && timeout < 300) {
-                Thread.sleep(100);
-                timeout++;
-            }
-            
-            return response[0] != null ? response[0] : "Timeout";
-        } else {
-            return "USSD sent via dial intent";
-        }
-    }
 }
